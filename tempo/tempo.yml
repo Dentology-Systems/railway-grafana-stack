@@ -20,7 +20,8 @@ distributor:
           endpoint: "0.0.0.0:4318"
 query_frontend:
   max_outstanding_per_tenant: 100
-  max_query_length: 168h
+  search:
+    max_duration: 720h
 querier:
   max_concurrent_queries: 20
 metrics_generator:
