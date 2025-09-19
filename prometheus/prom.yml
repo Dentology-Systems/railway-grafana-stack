@@ -1,18 +1,9 @@
 global:
-  scrape_interval: 30s # Default scrape interval
+  scrape_interval: 30s
 
 rule_files:
 
 scrape_configs:
-  # Prometheus self-monitoring
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
-
-  # Tempo metrics generator - scrape generated metrics from traces
-  - job_name: 'tempo-metrics'
-    static_configs:
-      - targets: ['tempo.railway.internal:3200']
-    metrics_path: /metrics
-    scrape_interval: 30s
-    scrape_timeout: 30s
