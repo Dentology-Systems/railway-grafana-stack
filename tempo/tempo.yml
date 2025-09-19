@@ -33,6 +33,11 @@ metrics_generator:
     path: /var/tempo/generator/wal
   traces_storage:
     path: /var/tempo/generator/traces
+  remote_write:
+    - url: http://prometheus.railway.internal:9090/api/v1/write
+      send_exemplars: true
+      headers:
+        X-Prometheus-Remote-Write-Version: "0.1.0"
   processor:
     service_graphs:
       histogram_buckets: [0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4, 12.8]
