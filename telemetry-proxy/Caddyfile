@@ -1,0 +1,52 @@
+{
+	admin off
+	auto_https off
+	persist_config off
+}
+
+# Combined telemetry ingress: ONE public, authenticated endpoint that path-routes
+#   /v1/*    (OTLP HTTP)       -> Tempo
+#   /loki/*  (Loki push/query) -> Loki
+# Both routes share one API_KEY (traces and logs use the same key today). To use
+# different keys per signal, swap {$API_KEY} for {$TEMPO_API_KEY} / {$LOKI_API_KEY}.
+# Caddy/Go re-resolves DNS and retries dead upstream connections, so it self-heals
+# across Tempo/Loki redeploys instead of getting stuck like a hand-rolled fetch.
+:{$PORT:8080} {
+	# Railway healthcheck (no auth)
+	handle /health {
+		respond "ok" 200
+	}
+
+	# --- Traces -> Tempo --- (matches only when path AND key match)
+	@traces {
+		path /v1/* /traces /traces/*
+		header X-API-Key {$API_KEY}
+	}
+	handle @traces {
+		reverse_proxy {$TEMPO_INTERNAL_URL:http://tempo.railway.internal:4318} {
+			lb_try_duration 5s
+			transport http {
+				dial_timeout 5s
+				response_header_timeout 30s
+			}
+		}
+	}
+
+	# --- Logs -> Loki ---
+	@logs {
+		path /loki/* /api/*
+		header X-API-Key {$API_KEY}
+	}
+	handle @logs {
+		reverse_proxy {$LOKI_INTERNAL_URL:http://loki.railway.internal:3100} {
+			lb_try_duration 5s
+			transport http {
+				dial_timeout 5s
+				response_header_timeout 30s
+			}
+		}
+	}
+
+	# Unknown route, or missing/wrong key
+	respond "Unauthorized or unknown route" 401
+}

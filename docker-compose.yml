@@ -34,26 +34,16 @@ services:
     volumes:
       - tempo_data:/var/tempo
 
-  tempo_proxy:
+  telemetry_proxy:
     build:
-      context: ./tempo-proxy
+      context: ./telemetry-proxy
       dockerfile: Dockerfile
     ports:
-      - "8080:8080" # public OTLP ingress (auth + forward to tempo)
+      - "8080:8080" # combined ingress: /v1/* -> tempo (traces), /loki/* -> loki (logs)
     environment:
       - PORT=8080
       - API_KEY=devkey
       - TEMPO_INTERNAL_URL=http://tempo:4318
-
-  loki_proxy:
-    build:
-      context: ./loki-proxy
-      dockerfile: Dockerfile
-    ports:
-      - "8081:8080" # public log ingress (auth + forward to loki)
-    environment:
-      - PORT=8080
-      - API_KEY=devkey
       - LOKI_INTERNAL_URL=http://loki:3100
 
   grafana:
