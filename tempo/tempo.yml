@@ -44,7 +44,17 @@ metrics_generator:
     service_graphs:
       histogram_buckets: [0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4, 12.8]
     span_metrics:
-      histogram_buckets: [0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
+      # Buckets extended past 10s so slow spans (e.g. multi-second Prisma
+      # queries / getCommandMenuData) resolve in p95/p99 instead of clamping
+      # at the old 10s ceiling.
+      histogram_buckets: [0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 20, 30, 60]
+      # Promote Prisma's per-operation span attributes (model + method, e.g.
+      # model="Client" method="findMany") to metric labels, so slow queries can
+      # be identified per-operation instead of all collapsing under the generic
+      # prisma:client:* span names. These labels are empty for non-Prisma spans.
+      dimensions:
+        - model
+        - method
 
 # Enable the metrics-generator processors per-tenant. Without this block the
 # generator stays idle no matter what is configured above.
