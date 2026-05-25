@@ -1,0 +1,33 @@
+{
+	admin off
+	auto_https off
+	persist_config off
+}
+
+# Public, authenticated OTLP ingress for traces.
+# Railway provides $PORT. Traces are forwarded to Tempo's OTLP HTTP receiver
+# over the (IPv6) private network. Caddy/Go re-resolves DNS and retries dead
+# connections, so this self-heals across Tempo redeploys instead of getting
+# stuck the way a hand-rolled fetch loop does.
+:{$PORT:8080} {
+	# Railway healthcheck target
+	handle /health {
+		respond "ok" 200
+	}
+
+	# Require the shared API key the app's OTel exporter sends (X-API-Key).
+	@authorized header X-API-Key {$API_KEY}
+	handle @authorized {
+		reverse_proxy {$TEMPO_INTERNAL_URL:http://tempo.railway.internal:4318} {
+			# Fail fast on a bad dial and retry rather than hang for 15s.
+			lb_try_duration 5s
+			transport http {
+				dial_timeout 5s
+				response_header_timeout 30s
+			}
+		}
+	}
+
+	# No / wrong key
+	respond "Unauthorized" 401
+}
