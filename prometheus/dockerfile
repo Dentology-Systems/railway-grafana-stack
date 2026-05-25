@@ -8,4 +8,6 @@ COPY prom.yml /etc/prometheus/prom.yml
 # Command to run Prometheus
 # --web.enable-remote-write-receiver: accept Tempo's generated span metrics at /api/v1/write
 # --web.listen-address=[::]:9090: bind IPv6 so the service is reachable over Railway's private network
-CMD ["--config.file=/etc/prometheus/prom.yml", "--storage.tsdb.path=/prometheus", "--web.enable-remote-write-receiver", "--web.listen-address=[::]:9090"]
+# --storage.tsdb.no-lockfile: avoid the TSDB lock deadlock during Railway's overlapping
+#   redeploys (new container starts while the old still holds the volume lock)
+CMD ["--config.file=/etc/prometheus/prom.yml", "--storage.tsdb.path=/prometheus", "--web.enable-remote-write-receiver", "--web.listen-address=[::]:9090", "--storage.tsdb.no-lockfile"]

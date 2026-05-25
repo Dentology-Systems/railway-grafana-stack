@@ -1,4 +1,7 @@
-ARG VERSION=latest
+# Pinned to a stable 2.x. Do NOT use `latest` — it floated to v3.0.0-rc.1,
+# which removed the top-level `compactor` and `metrics_generator.traces_storage`
+# fields this config uses, breaking startup.
+ARG VERSION=2.8.1
 
 FROM grafana/tempo:${VERSION}
 
