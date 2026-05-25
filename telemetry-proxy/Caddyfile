@@ -47,6 +47,25 @@
 		}
 	}
 
+	# --- Tempo query API (TraceQL search / get-trace-by-id) -> Tempo :3200 ---
+	# Read access to trace data. Distinct /tempo/* prefix (Loki owns /api/*); the
+	# prefix is stripped before forwarding, so GET /tempo/api/search?q=<traceql>
+	# hits Tempo's /api/search. Same X-API-Key as ingest.
+	@tempoq {
+		path /tempo/*
+		header X-API-Key {$API_KEY}
+	}
+	handle @tempoq {
+		uri strip_prefix /tempo
+		reverse_proxy {$TEMPO_QUERY_URL:http://tempo.railway.internal:3200} {
+			lb_try_duration 5s
+			transport http {
+				dial_timeout 5s
+				response_header_timeout 30s
+			}
+		}
+	}
+
 	# Unknown route, or missing/wrong key
 	respond "Unauthorized or unknown route" 401
 }
