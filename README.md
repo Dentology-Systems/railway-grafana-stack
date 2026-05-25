@@ -21,6 +21,79 @@ This template is perfect for teams who need a comprehensive observability soluti
 - **Customizable**: Fork the repository to customize configuration files for any service. You can take full control and edit anything you'd need to as you scale.
 - **One-Click Deploy**: Get a complete Grafana-based observability stack running in minutes.
 
+---
+
+## Dentology fork — deployment notes
+
+> This fork (`Dentology-Systems/railway-grafana-stack`) runs on Railway inside the **Dentology** project. Beyond the upstream template it adds a **combined telemetry proxy**, **per-tRPC-endpoint metrics** via Tempo's metrics-generator, and several Railway-specific fixes. This section documents how it's wired and the gotchas we hit, so they don't bite again.
+
+### How telemetry flows
+
+`dentology-app` runs on **Vercel** (not Railway), so it can't reach Railway's IPv6 private network directly. It ships telemetry to a public, authenticated **combined proxy**, which forwards to Tempo/Loki over the private network:
+
+```
+dentology-app (Vercel)
+  │  traces:  POST ${OTEL_HOST}/v1/traces           (app/lib/otel.ts; OTEL_HOST + OTEL_API_KEY)
+  │  logs:    POST ${LOKI_HOST}/loki/api/v1/push    (pino-loki; LOKI_HOST + LOKI_API_KEY)
+  ▼   (public, X-API-Key auth)
+dentology-telemetry-proxy.up.railway.app  ← Caddy (telemetry-proxy/), validates X-API-Key
+  │  /v1/*   ─▶ tempo.railway.internal:4318   (OTLP HTTP)
+  │  /loki/* ─▶ loki.railway.internal:3100    (Loki push)
+  ▼
+Tempo ─(metrics-generator, remote_write)─▶ Prometheus ─▶ Grafana
+Loki  ───────────────────────────────────────────────▶ Grafana
+```
+
+App-side env vars (set in **Vercel**); telemetry only ships when `NODE_ENV==='production'` and the vars are set:
+
+| Signal | Code | Env vars | Endpoint |
+|--------|------|----------|----------|
+| Traces | `apps/dentology/app/lib/otel.ts` (OTLP HTTP) | `OTEL_HOST`, `OTEL_API_KEY` | `${OTEL_HOST}/v1/traces` |
+| Logs | `apps/dentology/app/lib/log.ts`, `libs/shared/logger/` (pino-loki) | `LOKI_HOST`, `LOKI_API_KEY` | `${LOKI_HOST}/loki/api/v1/push` |
+
+Both `OTEL_HOST` and `LOKI_HOST` point at the **same** combined proxy domain.
+
+### The combined telemetry proxy (`telemetry-proxy/`)
+
+A single pinned **Caddy** service (`caddy:2.8.4-alpine`) that path-routes and authenticates:
+
+- `/v1/*` → Tempo (`TEMPO_INTERNAL_URL`, default `http://tempo.railway.internal:4318`)
+- `/loki/*` → Loki (`LOKI_INTERNAL_URL`, default `http://loki.railway.internal:3100`)
+- every request needs `X-API-Key: $API_KEY`; `/health` is open for Railway's healthcheck
+
+It replaced two hand-rolled **Bun-function** proxies (`Tempo proxy`, `Loki proxy`) that cached DNS / reused dead keep-alive connections and so **got stuck (15s timeouts → 502) after any Tempo/Loki redeploy**, needing manual restarts. Caddy's Go transport re-resolves DNS and retries dead connections, so it self-heals. (`tempo-proxy/` is a single-purpose Caddy variant kept until that legacy service is decommissioned.)
+
+### Per-tRPC-endpoint metrics (Tempo metrics-generator)
+
+There is **no "aggregation plugin"** — RED metrics per endpoint come from **Tempo's metrics-generator**, configured in `tempo/tempo.yml`:
+
+- processors are enabled per-tenant via the **`overrides`** block — defining the `metrics_generator` block alone does nothing
+- it **remote-writes** to Prometheus (`metrics_generator.storage.remote_write`)
+- Prometheus must accept it (`--web.enable-remote-write-receiver`)
+
+Generated series are labelled by `span_name` (= the tRPC procedure, e.g. `trpc.query.sidebar.getUnscreenedAppointments`):
+
+```promql
+# request rate per endpoint
+sum by (span_name) (rate(traces_spanmetrics_calls_total{span_name=~"trpc.*"}[5m]))
+# p95 latency per endpoint
+histogram_quantile(0.95, sum by (span_name, le) (rate(traces_spanmetrics_latency_bucket{span_name=~"trpc.*"}[5m])))
+```
+
+(Prometheus datasource UID `grafana_prometheus`, Loki UID `grafana_lokiq`.)
+
+### Railway gotchas & lessons learned
+
+- **Pin every image — never `latest`.** Tempo was on `latest`, which floated to `v3.0.0-rc.1` and broke startup (3.0 removed the top-level `compactor` and `metrics_generator.traces_storage` fields). Pinned to `2.8.1`; Loki/Grafana/Caddy are pinned too.
+- **A dashboard `VERSION` variable overrides the Dockerfile `ARG VERSION`.** Each service's image tag is ultimately driven by its `VERSION` service variable (passed as a build arg), so a Dockerfile pin is silently ignored unless they match. Keep them in sync.
+- **Railway's private network is IPv6-only — bind `[::]`, not `0.0.0.0`.** Services on `0.0.0.0` are unreachable via `*.railway.internal` (symptom: callers hang and time out). Fixed Tempo's OTLP receivers (`[::]:4317` / `[::]:4318` in `tempo.yml`) and Prometheus (`--web.listen-address=[::]:9090`).
+- **Prometheus CMD flags** (`prometheus/dockerfile`): `--web.enable-remote-write-receiver` (accept Tempo's generated metrics), `--web.listen-address=[::]:9090` (IPv6), `--storage.tsdb.no-lockfile` (avoid the TSDB volume-lock deadlock when a redeploy's new container starts before the old releases the lock).
+- **Deploying via the CLI:** `railway up <dir> --path-as-root --service "<name>"` uploads just that folder as the build context — no GitHub link or Root Directory needed. Connecting a **GitHub repo** or a **custom domain** via the CLI fails with a misleading `Unauthorized` (those need dashboard authorization). A **capitalized `Dockerfile`** auto-detects; a lowercase `dockerfile` needs `RAILWAY_DOCKERFILE_PATH=/<dir>/dockerfile`. Mutating CLI commands need a non-expired `railway login`. Note: a service deployed with `railway up` does **not** auto-deploy on git push unless its Source is connected to GitHub in the dashboard.
+- **Railway UI service "groups" are cosmetic** — they don't affect private networking; all services in the same project+environment share the network.
+- **Local dev:** `docker-compose.yml` runs the whole stack (including `telemetry_proxy`) locally; Railway does **not** use it — each service builds independently from its folder.
+
+---
+
 ## Quick Start Guide
 
 1. Click the "Deploy on Railway" button at the top of this page
