@@ -1,0 +1,371 @@
+{
+  "uid": "trpc-endpoints",
+  "title": "tRPC Endpoints",
+  "tags": ["trpc", "dentology", "spanmetrics"],
+  "editable": true,
+  "schemaVersion": 39,
+  "timezone": "",
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "endpoint",
+        "label": "tRPC endpoint",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+        "definition": "label_values(traces_spanmetrics_calls_total{span_name=~\"trpc\\\\.(query|mutation)\\\\..*\"}, span_name)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(traces_spanmetrics_calls_total{span_name=~\"trpc\\\\.(query|mutation)\\\\..*\"}, span_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "multi": true,
+        "current": { "text": "All", "value": "$__all" },
+        "refresh": 2,
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total tRPC request rate",
+      "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+      "gridPos": { "x": 0, "y": 0, "w": 8, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": 2,
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+          "expr": "sum(rate(traces_spanmetrics_calls_total{span_name=~\"trpc\\\\.(query|mutation)\\\\..*\", span_name=~\"${endpoint:regex}\"}[$__rate_interval]))"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Overall p95 latency",
+      "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+      "gridPos": { "x": 8, "y": 0, "w": 8, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(traces_spanmetrics_latency_bucket{span_name=~\"trpc\\\\.(query|mutation)\\\\..*\", span_name=~\"${endpoint:regex}\"}[$__rate_interval])))"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Error rate",
+      "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+      "gridPos": { "x": 16, "y": 0, "w": 8, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+          "expr": "100 * sum(rate(traces_spanmetrics_calls_total{span_name=~\"trpc\\\\.(query|mutation)\\\\..*\", span_name=~\"${endpoint:regex}\", status_code=\"STATUS_CODE_ERROR\"}[$__rate_interval])) / sum(rate(traces_spanmetrics_calls_total{span_name=~\"trpc\\\\.(query|mutation)\\\\..*\", span_name=~\"${endpoint:regex}\"}[$__rate_interval]))"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Request rate by endpoint",
+      "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 9 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "lineWidth": 1
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+          "expr": "sum by (span_name) (rate(traces_spanmetrics_calls_total{span_name=~\"trpc\\\\.(query|mutation)\\\\..*\", span_name=~\"${endpoint:regex}\"}[$__rate_interval]))",
+          "legendFormat": "{{span_name}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "p95 latency by endpoint",
+      "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 9 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "lineWidth": 1
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+          "expr": "histogram_quantile(0.95, sum by (le, span_name) (rate(traces_spanmetrics_latency_bucket{span_name=~\"trpc\\\\.(query|mutation)\\\\..*\", span_name=~\"${endpoint:regex}\"}[$__rate_interval])))",
+          "legendFormat": "{{span_name}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "p50 latency by endpoint",
+      "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+      "gridPos": { "x": 0, "y": 13, "w": 12, "h": 9 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "lineWidth": 1
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+          "expr": "histogram_quantile(0.50, sum by (le, span_name) (rate(traces_spanmetrics_latency_bucket{span_name=~\"trpc\\\\.(query|mutation)\\\\..*\", span_name=~\"${endpoint:regex}\"}[$__rate_interval])))",
+          "legendFormat": "{{span_name}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Error rate by endpoint",
+      "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+      "gridPos": { "x": 12, "y": 13, "w": 12, "h": 9 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "showPoints": "auto",
+            "lineWidth": 1
+          },
+          "color": { "mode": "fixed", "fixedColor": "red" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+          "expr": "sum by (span_name) (rate(traces_spanmetrics_calls_total{span_name=~\"trpc\\\\.(query|mutation)\\\\..*\", span_name=~\"${endpoint:regex}\", status_code=\"STATUS_CODE_ERROR\"}[$__rate_interval]))",
+          "legendFormat": "{{span_name}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Per-endpoint summary",
+      "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+      "gridPos": { "x": 0, "y": 22, "w": 24, "h": 10 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "align": "auto", "filterable": true } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Req/s" },
+            "properties": [{ "id": "unit", "value": "reqps" }, { "id": "decimals", "value": 3 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Errors/s" },
+            "properties": [{ "id": "unit", "value": "reqps" }, { "id": "decimals", "value": 3 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "p50" },
+            "properties": [{ "id": "unit", "value": "s" }, { "id": "decimals", "value": 3 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "p95" },
+            "properties": [{ "id": "unit", "value": "s" }, { "id": "decimals", "value": 3 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "p99" },
+            "properties": [{ "id": "unit", "value": "s" }, { "id": "decimals", "value": 3 }]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Req/s", "desc": true }]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "instant": true,
+          "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+          "expr": "sum by (span_name) (rate(traces_spanmetrics_calls_total{span_name=~\"trpc\\\\.(query|mutation)\\\\..*\", span_name=~\"${endpoint:regex}\"}[$__rate_interval]))"
+        },
+        {
+          "refId": "B",
+          "format": "table",
+          "instant": true,
+          "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+          "expr": "histogram_quantile(0.50, sum by (le, span_name) (rate(traces_spanmetrics_latency_bucket{span_name=~\"trpc\\\\.(query|mutation)\\\\..*\", span_name=~\"${endpoint:regex}\"}[$__rate_interval])))"
+        },
+        {
+          "refId": "C",
+          "format": "table",
+          "instant": true,
+          "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+          "expr": "histogram_quantile(0.95, sum by (le, span_name) (rate(traces_spanmetrics_latency_bucket{span_name=~\"trpc\\\\.(query|mutation)\\\\..*\", span_name=~\"${endpoint:regex}\"}[$__rate_interval])))"
+        },
+        {
+          "refId": "D",
+          "format": "table",
+          "instant": true,
+          "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+          "expr": "histogram_quantile(0.99, sum by (le, span_name) (rate(traces_spanmetrics_latency_bucket{span_name=~\"trpc\\\\.(query|mutation)\\\\..*\", span_name=~\"${endpoint:regex}\"}[$__rate_interval])))"
+        },
+        {
+          "refId": "E",
+          "format": "table",
+          "instant": true,
+          "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+          "expr": "sum by (span_name) (rate(traces_spanmetrics_calls_total{span_name=~\"trpc\\\\.(query|mutation)\\\\..*\", span_name=~\"${endpoint:regex}\", status_code=\"STATUS_CODE_ERROR\"}[$__rate_interval]))"
+        }
+      ],
+      "transformations": [
+        { "id": "joinByField", "options": { "byField": "span_name", "mode": "outer" } },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "Time 4": true,
+              "Time 5": true
+            },
+            "renameByName": {
+              "span_name": "Endpoint",
+              "Value #A": "Req/s",
+              "Value #B": "p50",
+              "Value #C": "p95",
+              "Value #D": "p99",
+              "Value #E": "Errors/s"
+            },
+            "indexByName": {
+              "span_name": 0,
+              "Value #A": 1,
+              "Value #B": 2,
+              "Value #C": 3,
+              "Value #D": 4,
+              "Value #E": 5
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
