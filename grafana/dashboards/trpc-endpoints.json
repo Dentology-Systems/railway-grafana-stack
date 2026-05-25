@@ -15,15 +15,12 @@
         "type": "query",
         "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
         "definition": "label_values(traces_spanmetrics_calls_total{span_name=~\"trpc.(query|mutation)..*\"}, span_name)",
-        "query": {
-          "qryType": 1,
-          "query": "label_values(traces_spanmetrics_calls_total{span_name=~\"trpc.(query|mutation)..*\"}, span_name)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
+        "query": "label_values(traces_spanmetrics_calls_total{span_name=~\"trpc.(query|mutation)..*\"}, span_name)",
         "includeAll": true,
+        "allValue": ".*",
         "multi": true,
         "current": { "text": "All", "value": "$__all" },
-        "refresh": 2,
+        "refresh": 1,
         "sort": 1
       }
     ]
