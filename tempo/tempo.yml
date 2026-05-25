@@ -31,6 +31,9 @@ metrics_generator:
       cluster: railway
   storage:
     path: /var/tempo/generator/wal
+    remote_write:
+      - url: http://prometheus.railway.internal:9090/api/v1/write
+        send_exemplars: true
   traces_storage:
     path: /var/tempo/generator/traces
   processor:
@@ -38,3 +41,10 @@ metrics_generator:
       histogram_buckets: [0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4, 12.8]
     span_metrics:
       histogram_buckets: [0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
+
+# Enable the metrics-generator processors per-tenant. Without this block the
+# generator stays idle no matter what is configured above.
+overrides:
+  defaults:
+    metrics_generator:
+      processors: [service-graphs, span-metrics]
