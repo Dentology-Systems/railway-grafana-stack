@@ -45,6 +45,17 @@ services:
       - API_KEY=devkey
       - TEMPO_INTERNAL_URL=http://tempo:4318
 
+  loki_proxy:
+    build:
+      context: ./loki-proxy
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8080" # public log ingress (auth + forward to loki)
+    environment:
+      - PORT=8080
+      - API_KEY=devkey
+      - LOKI_INTERNAL_URL=http://loki:3100
+
   grafana:
     build:
       context: ./grafana
