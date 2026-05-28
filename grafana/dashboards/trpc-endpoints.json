@@ -363,6 +363,125 @@
           }
         }
       ]
+    },
+    {
+      "id": 9,
+      "type": "row",
+      "title": "Event-loop health (starvation)",
+      "gridPos": { "x": 0, "y": 32, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Starved tRPC requests (% high event-loop utilization, over range)",
+      "description": "Share of requests whose event loop was busy >90% of the request window (elu_bucket=high). High values mean the JS thread was saturated and request continuations were not getting scheduled — i.e. event-loop starvation, NOT DB/network wait.",
+      "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+      "gridPos": { "x": 0, "y": 33, "w": 8, "h": 6 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "min": 0,
+          "max": 100,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 2 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+          "expr": "100 * sum(rate(traces_spanmetrics_calls_total{span_name=~\"trpc.(query|mutation)..*\", span_name=~\"${endpoint:regex}\", elu_bucket=\"high\"}[$__range])) / sum(rate(traces_spanmetrics_calls_total{span_name=~\"trpc.(query|mutation)..*\", span_name=~\"${endpoint:regex}\", elu_bucket=~\"high|med|low\"}[$__range]))"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Event-loop saturation by endpoint (% high-ELU requests)",
+      "description": "Per-endpoint share of requests in the high event-loop-utilization bucket. Spikes here line up with the latency gaps that are caused by event-loop starvation rather than slow queries.",
+      "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+      "gridPos": { "x": 8, "y": 33, "w": 16, "h": 9 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "showPoints": "auto",
+            "lineWidth": 1
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+          "expr": "100 * sum by (span_name) (rate(traces_spanmetrics_calls_total{span_name=~\"trpc.(query|mutation)..*\", span_name=~\"${endpoint:regex}\", elu_bucket=\"high\"}[$__rate_interval])) / sum by (span_name) (rate(traces_spanmetrics_calls_total{span_name=~\"trpc.(query|mutation)..*\", span_name=~\"${endpoint:regex}\", elu_bucket=~\"high|med|low\"}[$__rate_interval]))",
+          "legendFormat": "{{span_name}}"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Request mix by event-loop-utilization bucket (req/h)",
+      "description": "Volume of requests per ELU bucket over time. A growing 'high' band is the starvation signal; 'low' = healthy (loop idle, waiting on I/O).",
+      "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+      "gridPos": { "x": 0, "y": 39, "w": 8, "h": 3 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "stacking": { "mode": "normal", "group": "A" },
+            "lineWidth": 0
+          }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "high" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] },
+          { "matcher": { "id": "byName", "options": "med" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } }] },
+          { "matcher": { "id": "byName", "options": "low" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
+          "expr": "3600 * sum by (elu_bucket) (rate(traces_spanmetrics_calls_total{span_name=~\"trpc.(query|mutation)..*\", span_name=~\"${endpoint:regex}\", elu_bucket=~\"high|med|low\"}[$__rate_interval]))",
+          "legendFormat": "{{elu_bucket}}"
+        }
+      ]
     }
   ]
 }
