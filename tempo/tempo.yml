@@ -61,10 +61,18 @@ metrics_generator:
       # non-tRPC spans. Replaces the earlier elu_bucket signal, which was
       # global-utilization based and saturated at ~70% high under any
       # concurrent traffic.
+      #
+      # cpu_origin = where the request's wall-clock duration was spent, from
+      # process.cpuUsage() delta vs duration. self = >60% CPU (own code
+      # blocked the loop); external = <20% CPU (waited on GC / concurrent
+      # requests / transport backlog / other instance pressure); mixed
+      # otherwise. Pairs with event_loop_bucket to distinguish "this request
+      # caused the starvation" from "this request was a victim of it".
       dimensions:
         - model
         - method
         - event_loop_bucket
+        - cpu_origin
 
 # Enable the metrics-generator processors per-tenant. Without this block the
 # generator stays idle no matter what is configured above.
