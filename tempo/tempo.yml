@@ -53,15 +53,18 @@ metrics_generator:
       # be identified per-operation instead of all collapsing under the generic
       # prisma:client:* span names. These labels are empty for non-Prisma spans.
       #
-      # elu_bucket = per-request event-loop utilization bucket (high/med/low),
-      # set by the tRPC otel-middleware in the app from
-      # perf_hooks.eventLoopUtilization(). "high" (~loop saturated) flags
-      # event-loop starvation — slow requests where the JS thread never got
-      # scheduled (vs waiting on DB/network). Empty for non-tRPC spans.
+      # event_loop_bucket = per-request event-loop scheduling-delay bucket
+      # (high >500ms p99 / med >50ms / low) computed by the tRPC otel-middleware
+      # from a per-request setInterval sampler. "high" flags event-loop
+      # starvation — slow requests where the JS thread couldn't schedule its
+      # continuations on time (vs genuinely waiting on DB/network). Empty for
+      # non-tRPC spans. Replaces the earlier elu_bucket signal, which was
+      # global-utilization based and saturated at ~70% high under any
+      # concurrent traffic.
       dimensions:
         - model
         - method
-        - elu_bucket
+        - event_loop_bucket
 
 # Enable the metrics-generator processors per-tenant. Without this block the
 # generator stays idle no matter what is configured above.

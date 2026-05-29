@@ -375,8 +375,8 @@
     {
       "id": 10,
       "type": "stat",
-      "title": "Starved tRPC requests (% high event-loop utilization, over range)",
-      "description": "Share of requests whose event loop was busy >90% of the request window (elu_bucket=high). High values mean the JS thread was saturated and request continuations were not getting scheduled — i.e. event-loop starvation, NOT DB/network wait.",
+      "title": "Starved tRPC requests (% high event-loop delay, over range)",
+      "description": "Share of requests where measured event-loop scheduling-delay p99 was >500ms (event_loop_bucket=high) during the request. High values mean the JS thread couldn't schedule its continuations on time — i.e. event-loop starvation, NOT DB/network wait. p99 ms is also kept as a raw span attribute (app.eventloop_p99_ms) for per-trace drilldown.",
       "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
       "gridPos": { "x": 0, "y": 33, "w": 8, "h": 6 },
       "fieldConfig": {
@@ -408,15 +408,15 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
-          "expr": "100 * sum(rate(traces_spanmetrics_calls_total{span_name=~\"trpc.(query|mutation)..*\", span_name=~\"${endpoint:regex}\", elu_bucket=\"high\"}[$__range])) / sum(rate(traces_spanmetrics_calls_total{span_name=~\"trpc.(query|mutation)..*\", span_name=~\"${endpoint:regex}\", elu_bucket=~\"high|med|low\"}[$__range]))"
+          "expr": "100 * sum(rate(traces_spanmetrics_calls_total{span_name=~\"trpc.(query|mutation)..*\", span_name=~\"${endpoint:regex}\", event_loop_bucket=\"high\"}[$__range])) / sum(rate(traces_spanmetrics_calls_total{span_name=~\"trpc.(query|mutation)..*\", span_name=~\"${endpoint:regex}\", event_loop_bucket=~\"high|med|low\"}[$__range]))"
         }
       ]
     },
     {
       "id": 11,
       "type": "timeseries",
-      "title": "Event-loop saturation by endpoint (% high-ELU requests)",
-      "description": "Per-endpoint share of requests in the high event-loop-utilization bucket. Spikes here line up with the latency gaps that are caused by event-loop starvation rather than slow queries.",
+      "title": "Event-loop starvation by endpoint (% requests with p99 delay >500ms)",
+      "description": "Per-endpoint share of requests in the high event-loop-delay bucket. Spikes here line up with the latency gaps caused by event-loop starvation rather than slow queries.",
       "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
       "gridPos": { "x": 8, "y": 33, "w": 16, "h": 9 },
       "fieldConfig": {
@@ -442,7 +442,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
-          "expr": "100 * sum by (span_name) (rate(traces_spanmetrics_calls_total{span_name=~\"trpc.(query|mutation)..*\", span_name=~\"${endpoint:regex}\", elu_bucket=\"high\"}[$__rate_interval])) / sum by (span_name) (rate(traces_spanmetrics_calls_total{span_name=~\"trpc.(query|mutation)..*\", span_name=~\"${endpoint:regex}\", elu_bucket=~\"high|med|low\"}[$__rate_interval]))",
+          "expr": "100 * sum by (span_name) (rate(traces_spanmetrics_calls_total{span_name=~\"trpc.(query|mutation)..*\", span_name=~\"${endpoint:regex}\", event_loop_bucket=\"high\"}[$__rate_interval])) / sum by (span_name) (rate(traces_spanmetrics_calls_total{span_name=~\"trpc.(query|mutation)..*\", span_name=~\"${endpoint:regex}\", event_loop_bucket=~\"high|med|low\"}[$__rate_interval]))",
           "legendFormat": "{{span_name}}"
         }
       ]
@@ -450,8 +450,8 @@
     {
       "id": 12,
       "type": "timeseries",
-      "title": "Request mix by event-loop-utilization bucket (req/h)",
-      "description": "Volume of requests per ELU bucket over time. A growing 'high' band is the starvation signal; 'low' = healthy (loop idle, waiting on I/O).",
+      "title": "Request mix by event-loop-delay bucket (req/h)",
+      "description": "Volume of requests per event-loop-delay bucket over time (thresholds: high=p99 >500ms, med >50ms, low ≤50ms). A growing 'high' band is the starvation signal; 'low' = healthy.",
       "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
       "gridPos": { "x": 0, "y": 39, "w": 8, "h": 3 },
       "fieldConfig": {
@@ -478,8 +478,8 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "grafana_prometheus" },
-          "expr": "3600 * sum by (elu_bucket) (rate(traces_spanmetrics_calls_total{span_name=~\"trpc.(query|mutation)..*\", span_name=~\"${endpoint:regex}\", elu_bucket=~\"high|med|low\"}[$__rate_interval]))",
-          "legendFormat": "{{elu_bucket}}"
+          "expr": "3600 * sum by (event_loop_bucket) (rate(traces_spanmetrics_calls_total{span_name=~\"trpc.(query|mutation)..*\", span_name=~\"${endpoint:regex}\", event_loop_bucket=~\"high|med|low\"}[$__rate_interval]))",
+          "legendFormat": "{{event_loop_bucket}}"
         }
       ]
     }
